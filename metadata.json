@@ -1,0 +1,6 @@
+{
+  "name": "SudoKu",
+  "description": "Game teka-teki logika SudoKu dengan pilihan tingkat kesulitan, tema warna lime green gelap & terang, fitur bantuan pemula, dan mode ragu-ragu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
