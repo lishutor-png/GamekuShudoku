@@ -89,7 +89,7 @@ fun SudokuHeader(
         ) {
           Image(
             painter = painterResource(id = R.drawable.sudoku_cool_logo),
-            contentDescription = "Logo SudoKu",
+            contentDescription = "Logo ShuDoku",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
           )
@@ -98,14 +98,14 @@ fun SudokuHeader(
         Column {
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-              text = "SUDO",
+              text = "SHU",
               fontSize = 20.sp,
               fontWeight = FontWeight.ExtraBold,
               letterSpacing = 0.5.sp,
               color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-              text = "KU",
+              text = "DOKU",
               fontSize = 20.sp,
               fontWeight = FontWeight.ExtraBold,
               letterSpacing = 0.5.sp,

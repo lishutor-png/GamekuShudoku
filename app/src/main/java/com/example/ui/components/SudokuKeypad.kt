@@ -1,8 +1,11 @@
 package com.example.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,10 +14,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -160,6 +165,61 @@ fun SudokuKeypad(
       )
     }
 
+    // Status Banner for Notes Mode (Ragu-ragu)
+    AnimatedVisibility(
+      visible = uiState.isNotesMode,
+      enter = fadeIn() + expandVertically(),
+      exit = fadeOut() + shrinkVertically()
+    ) {
+      Surface(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(top = 4.dp, bottom = 2.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = if (isDark) LimeAccent.copy(alpha = 0.16f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+        border = BorderStroke(
+          1.dp,
+          if (isDark) LimeAccent.copy(alpha = 0.45f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+        )
+      ) {
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+              imageVector = Icons.Default.Edit,
+              contentDescription = null,
+              tint = if (isDark) LimeAccent else MaterialTheme.colorScheme.primary,
+              modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+              text = "Mode Ragu-ragu Aktif",
+              style = MaterialTheme.typography.labelMedium,
+              fontWeight = FontWeight.Bold,
+              color = if (isDark) LimeAccent else MaterialTheme.colorScheme.primary
+            )
+          }
+          Text(
+            text = "Ketuk angka untuk catatan pensil",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
+      }
+    }
+
+    val selectedCell = uiState.selectedCell
+    val currentCellNotes = if (selectedCell != null) {
+      uiState.board.getOrNull(selectedCell.first)?.getOrNull(selectedCell.second)?.notes ?: emptySet()
+    } else {
+      emptySet()
+    }
+
     // Number Row (1 - 9)
     Row(
       modifier = Modifier
@@ -171,12 +231,15 @@ fun SudokuKeypad(
         val remaining = uiState.numberCounts[num] ?: 0
         val isCompleted = remaining == 0
         val isSelectedKey = uiState.selectedKeypadNumber == num
+        val isNotedInCell = currentCellNotes.contains(num)
 
         NumberKey(
           number = num,
           remaining = remaining,
           isCompleted = isCompleted,
           isSelected = isSelectedKey,
+          isNotedInCell = isNotedInCell,
+          isNotesMode = uiState.isNotesMode,
           isDark = isDark,
           onClick = { onNumberClick(num) },
           modifier = Modifier.weight(1f)
@@ -295,6 +358,8 @@ private fun NumberKey(
   remaining: Int,
   isCompleted: Boolean,
   isSelected: Boolean,
+  isNotedInCell: Boolean,
+  isNotesMode: Boolean,
   isDark: Boolean,
   onClick: () -> Unit,
   modifier: Modifier = Modifier
@@ -302,6 +367,7 @@ private fun NumberKey(
   val surfaceColor = when {
     isSelected -> if (isDark) LimeAccent.copy(alpha = 0.25f) else MaterialTheme.colorScheme.primaryContainer
     isCompleted -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    isNotesMode && isNotedInCell -> if (isDark) LimeAccent.copy(alpha = 0.18f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
     else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
   }
 
@@ -313,6 +379,7 @@ private fun NumberKey(
 
   val borderColor = when {
     isSelected -> if (isDark) LimeAccent else MaterialTheme.colorScheme.primary
+    isNotesMode && isNotedInCell -> if (isDark) LimeAccent.copy(alpha = 0.7f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
     else -> Color.Transparent
   }
 
@@ -320,30 +387,43 @@ private fun NumberKey(
     modifier = modifier
       .height(58.dp)
       .clip(RoundedCornerShape(10.dp))
-      .border(if (isSelected) 2.dp else 0.dp, borderColor, RoundedCornerShape(10.dp))
+      .border(if (isSelected || (isNotesMode && isNotedInCell)) 2.dp else 0.dp, borderColor, RoundedCornerShape(10.dp))
       .clickable(enabled = !isCompleted, onClick = onClick)
       .testTag("keypad_num_$number"),
     color = surfaceColor,
     shape = RoundedCornerShape(10.dp),
     tonalElevation = if (isSelected) 4.dp else 1.dp
   ) {
-    Column(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.Center
-    ) {
-      Text(
-        text = number.toString(),
-        fontSize = 20.sp,
-        fontWeight = FontWeight.Bold,
-        color = textColor
-      )
-      Text(
-        text = if (isCompleted) "✓" else remaining.toString(),
-        fontSize = 10.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = if (isCompleted) LimeAccent.copy(alpha = 0.8f) else textColor.copy(alpha = 0.6f)
-      )
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+      Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+      ) {
+        Text(
+          text = number.toString(),
+          fontSize = 20.sp,
+          fontWeight = FontWeight.Bold,
+          color = textColor
+        )
+        Text(
+          text = if (isCompleted) "✓" else remaining.toString(),
+          fontSize = 10.sp,
+          fontWeight = FontWeight.SemiBold,
+          color = if (isCompleted) LimeAccent.copy(alpha = 0.8f) else textColor.copy(alpha = 0.6f)
+        )
+      }
+
+      // Small indicator badge if this digit is noted in the selected cell
+      if (isNotedInCell && !isCompleted) {
+        Box(
+          modifier = Modifier
+            .align(Alignment.TopEnd)
+            .padding(4.dp)
+            .size(7.dp)
+            .background(if (isDark) LimeAccent else MaterialTheme.colorScheme.primary, CircleShape)
+        )
+      }
     }
   }
 }

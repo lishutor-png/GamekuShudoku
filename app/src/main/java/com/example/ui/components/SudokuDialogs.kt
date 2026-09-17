@@ -396,7 +396,7 @@ fun VictoryDialog(
         ) {
           Image(
             painter = painterResource(id = R.drawable.sudoku_cool_logo),
-            contentDescription = "Logo SudoKu",
+            contentDescription = "Logo ShuDoku",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
           )
@@ -411,7 +411,7 @@ fun VictoryDialog(
         )
 
         Text(
-          text = "Kamu berhasil menyelesaikan teka-teki SudoKu ini dengan sangat baik.",
+          text = "Kamu berhasil menyelesaikan teka-teki ShuDoku ini dengan sangat baik.",
           style = MaterialTheme.typography.bodyMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           textAlign = TextAlign.Center
@@ -600,7 +600,7 @@ fun HowToPlayDialog(onDismiss: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
       ) {
         Text(
-          text = "Panduan Bermain SudoKu",
+          text = "Panduan Bermain ShuDoku",
           style = MaterialTheme.typography.titleLarge,
           fontWeight = FontWeight.Bold
         )

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -107,6 +108,7 @@ fun SudokuBoard(
                   isSameNumber = isSameNumber && uiState.settings.highlightSameNumber,
                   isDark = isDark,
                   size = cellSize,
+                  activeValue = activeValue,
                   onCellClick = { onCellClick(r, c) },
                   modifier = Modifier
                     .weight(1f)
@@ -195,6 +197,7 @@ private fun SudokuCell(
   isSameNumber: Boolean,
   isDark: Boolean,
   size: Dp,
+  activeValue: Int?,
   onCellClick: () -> Unit,
   modifier: Modifier = Modifier
 ) {
@@ -248,41 +251,74 @@ private fun SudokuCell(
         textAlign = TextAlign.Center
       )
     } else if (cell.notes.isNotEmpty()) {
-      // 3x3 Notes grid for "Ragu-ragu"
-      NotesGrid(notes = cell.notes, isDark = isDark)
+      // High-visibility Notes Grid for "Ragu-ragu"
+      NotesGrid(
+        notes = cell.notes,
+        activeValue = activeValue,
+        isDark = isDark
+      )
     }
   }
 }
 
 @Composable
-private fun NotesGrid(notes: Set<Int>, isDark: Boolean) {
-  val noteColor = if (isDark) {
-    LimeAccent.copy(alpha = 0.85f)
-  } else {
-    MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-  }
-
+private fun NotesGrid(
+  notes: Set<Int>,
+  activeValue: Int?,
+  isDark: Boolean
+) {
   Column(
     modifier = Modifier
       .fillMaxSize()
-      .padding(2.dp),
+      .padding(1.dp),
     verticalArrangement = Arrangement.SpaceEvenly
   ) {
     for (row in 0 until 3) {
       Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+          .fillMaxWidth()
+          .weight(1f),
         horizontalArrangement = Arrangement.SpaceEvenly
       ) {
         for (col in 0 until 3) {
           val num = row * 3 + col + 1
-          Text(
-            text = if (notes.contains(num)) num.toString() else "",
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            color = noteColor,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.size(11.dp)
-          )
+          val isPresent = notes.contains(num)
+          val isMatchingActive = isPresent && activeValue != null && activeValue == num
+
+          Box(
+            modifier = Modifier
+              .weight(1f)
+              .fillMaxHeight()
+              .padding(0.5.dp)
+              .clip(RoundedCornerShape(3.dp))
+              .then(
+                when {
+                  isMatchingActive -> Modifier.background(
+                    if (isDark) LimeAccent else MaterialTheme.colorScheme.primary
+                  )
+                  isPresent -> Modifier.background(
+                    if (isDark) Color(0x38CCFF00) else Color(0x22006C4C)
+                  )
+                  else -> Modifier
+                }
+              ),
+            contentAlignment = Alignment.Center
+          ) {
+            if (isPresent) {
+              Text(
+                text = num.toString(),
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Black,
+                lineHeight = 11.5.sp,
+                color = when {
+                  isMatchingActive -> if (isDark) Color.Black else Color.White
+                  isDark -> Color(0xFFF2FF77)
+                  else -> Color(0xFF034D35)
+                },
+                textAlign = TextAlign.Center
+              )
+            }
+          }
         }
       }
     }
