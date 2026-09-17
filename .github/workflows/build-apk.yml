@@ -21,35 +21,43 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: gradle
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Accept Android SDK Licenses
-        run: yes | sdkmanager --licenses || true
+      - name: Accept Android SDK Licenses and Install Platform 36
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "platforms;android-36.1" "build-tools;36.0.0" || true
 
       - name: Setup Keystore and Environment
         run: |
           if [ -f "debug.keystore.base64" ]; then
-            base64 -d debug.keystore.base64 > debug.keystore || true
+            base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || true
           fi
-          if [ ! -f "debug.keystore" ]; then
+          if ! keytool -list -keystore debug.keystore -storepass android > /dev/null 2>&1; then
+            echo "Generating fresh debug.keystore"
+            rm -f debug.keystore
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
+          cp debug.keystore app/debug.keystore 2>/dev/null || true
           if [ ! -f ".env" ]; then
             touch .env
+          fi
+          if [ ! -f ".env.example" ]; then
+            touch .env.example
           fi
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build with Gradle
-        run: ./gradlew assembleDebug --no-daemon --no-configuration-cache --stacktrace
+      - name: Build Debug APK with Gradle
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: sudoku-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
 
