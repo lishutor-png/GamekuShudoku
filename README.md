@@ -14,7 +14,7 @@ Repository ini sudah dilengkapi dengan alur otomatis GitHub Actions (`.github/wo
 5. Pada bagian **Artifacts** di bawah halaman, klik file **sudoku-debug-apk** untuk mengunduh file `.zip` yang berisi file APK siap pasang ke ponsel Android Anda.
 
 ### Build APK Manual di Komputer Lokal:
-Pastikan Anda memiliki JDK 17 terpasang:
+Pastikan Anda memiliki JDK 21 terpasang:
 ```bash
 # Pastikan gradlew executable (Linux/macOS)
 chmod +x gradlew
