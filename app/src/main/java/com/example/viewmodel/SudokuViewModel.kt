@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class SudokuUiState(
   val board: List<List<CellData>> = emptyList(),
@@ -28,6 +30,7 @@ data class SudokuUiState(
   val timerSeconds: Long = 0L,
   val isPaused: Boolean = false,
   val mistakesCount: Int = 0,
+  val checksRemaining: Int = 3, // Tombol Cek dibatasi 3 kali
   val isGameWon: Boolean = false,
   val isGameOver: Boolean = false,
   val isDarkTheme: Boolean = true, // Default modern dark theme with lime green
@@ -55,14 +58,17 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
 
   init {
     loadSavedPreferences()
-    startNewGame(Difficulty.MUDAH)
+    val restored = restoreSavedGame()
+    if (!restored) {
+      startNewGame(Difficulty.MUDAH)
+    }
   }
 
   private fun loadSavedPreferences() {
     val isDark = prefs.getBoolean("is_dark_theme", true)
     val highlightSame = prefs.getBoolean("highlight_same", true)
     val highlightLines = prefs.getBoolean("highlight_lines", true)
-    val highlightDupes = prefs.getBoolean("highlight_dupes", true)
+    val highlightDupes = prefs.getBoolean("highlight_dupes", false)
     val autoRemoveNotes = prefs.getBoolean("auto_remove_notes", true)
     val mistakeLimit = prefs.getBoolean("mistake_limit", false)
 
@@ -111,6 +117,7 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
         timerSeconds = 0L,
         isPaused = false,
         mistakesCount = 0,
+        checksRemaining = 3,
         isGameWon = false,
         isGameOver = false,
         canUndo = false,
@@ -126,6 +133,7 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
     prefs.edit().putInt("games_played", currentPlayed).apply()
     _uiState.update { it.copy(stats = it.stats.copy(gamesPlayed = currentPlayed)) }
 
+    saveGameProgress()
     startTimer()
   }
 
@@ -140,18 +148,26 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
       while (true) {
         delay(1000)
         if (!_uiState.value.isPaused && !_uiState.value.isGameWon && !_uiState.value.isGameOver) {
-          _uiState.update { it.copy(timerSeconds = it.timerSeconds + 1) }
+          val newTime = _uiState.value.timerSeconds + 1
+          _uiState.update { it.copy(timerSeconds = newTime) }
+          // Auto-save timer periodically
+          if (newTime % 5 == 0L) {
+            prefs.edit().putLong("saved_timer", newTime).apply()
+          }
         }
       }
     }
   }
 
   fun togglePause() {
-    _uiState.update { it.copy(isPaused = !it.isPaused) }
+    val newPause = !_uiState.value.isPaused
+    _uiState.update { it.copy(isPaused = newPause) }
+    saveGameProgress()
   }
 
   fun setPaused(paused: Boolean) {
     _uiState.update { it.copy(isPaused = paused) }
+    saveGameProgress()
   }
 
   fun toggleTheme() {
@@ -234,6 +250,7 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
         hintMessage = null
       )
     }
+    saveGameProgress()
   }
 
   fun eraseCell() {
@@ -260,7 +277,11 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
 
     val refreshedBoard = newBoard.mapIndexed { r, row ->
       row.mapIndexed { c, cellItem ->
-        cellItem.copy(isError = conflicts.contains(Pair(r, c)))
+        if (r == selected.first && c == selected.second) {
+          cellItem.copy(isError = false)
+        } else {
+          cellItem.copy(isError = cellItem.isError && conflicts.contains(Pair(r, c)))
+        }
       }
     }
 
@@ -271,6 +292,7 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
         hintMessage = null
       )
     }
+    saveGameProgress()
   }
 
   private fun applyNumberToCell(r: Int, c: Int, number: Int) {
@@ -298,22 +320,15 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
         }
       }
       _uiState.update { it.copy(board = newBoard) }
+      saveGameProgress()
     } else {
-      // Normal confirmation
-      val correctValue = _uiState.value.solution[r][c]
-      val isCorrect = (number == correctValue)
-
-      var newMistakes = _uiState.value.mistakesCount
-      if (!isCorrect) {
-        newMistakes++
-      }
-
+      // Penempatan Angka Normal: Tidak langsung salah / dipotong penalti kesalahan
       val newBoard = _uiState.value.board.mapIndexed { rowIdx, rowList ->
         rowList.mapIndexed { colIdx, cell ->
           if (rowIdx == r && colIdx == c) {
-            cell.copy(value = number, notes = emptySet(), isError = !isCorrect)
-          } else if (_uiState.value.settings.autoRemoveNotes && isCorrect) {
-            // Remove confirmed number from notes in same row, col, and 3x3 box
+            cell.copy(value = number, notes = emptySet(), isError = false)
+          } else if (_uiState.value.settings.autoRemoveNotes) {
+            // Hapus angka konfirmasi dari catatan pada baris, kolom, dan blok 3x3 yang sama
             val sameRow = (rowIdx == r)
             val sameCol = (colIdx == c)
             val sameBox = (rowIdx / 3 == r / 3 && colIdx / 3 == c / 3)
@@ -328,20 +343,25 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
         }
       }
 
-      // Check conflicts
+      // Periksa duplikat jika diaktifkan di Pengaturan
       val conflicts = if (_uiState.value.settings.highlightDuplicates) {
         SudokuEngine.findConflictingCells(newBoard)
       } else emptySet()
 
       val refreshedBoard = newBoard.mapIndexed { rowIdx, rowList ->
         rowList.mapIndexed { colIdx, cell ->
-          cell.copy(isError = conflicts.contains(Pair(rowIdx, colIdx)) || (!isCorrect && rowIdx == r && colIdx == c))
+          if (rowIdx == r && colIdx == c) {
+            cell.copy(isError = false)
+          } else if (conflicts.contains(Pair(rowIdx, colIdx))) {
+            cell.copy(isError = true)
+          } else {
+            cell
+          }
         }
       }
 
       val remaining = calculateRemainingCounts(refreshedBoard)
       val won = SudokuEngine.isBoardSolved(refreshedBoard, _uiState.value.solution)
-      val gameOver = _uiState.value.settings.mistakeLimitEnabled && newMistakes >= _uiState.value.settings.maxMistakes
 
       if (won) {
         handleGameWon()
@@ -350,19 +370,19 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
       _uiState.update {
         it.copy(
           board = refreshedBoard,
-          mistakesCount = newMistakes,
           numberCounts = remaining,
           isGameWon = won,
-          isGameOver = gameOver,
           showVictoryDialog = won,
-          hintMessage = if (!isCorrect) "Angka $number kurang tepat di sini." else null
+          hintMessage = null
         )
       }
+      saveGameProgress()
     }
   }
 
   private fun handleGameWon() {
     timerJob?.cancel()
+    clearSavedProgress()
     val wonCount = _uiState.value.stats.gamesWon + 1
     val currentDiff = _uiState.value.difficulty
     val currentTime = _uiState.value.timerSeconds
@@ -452,6 +472,7 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
         hintMessage = "Bantuan: Mengisi angka $correctVal pada Baris ${r + 1}, Kolom ${c + 1}!"
       )
     }
+    saveGameProgress()
   }
 
   /**
@@ -480,6 +501,7 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
         hintMessage = "Semua catatan ragu-ragu otomatis terisi untuk membantu analisa!"
       )
     }
+    saveGameProgress()
   }
 
   fun clearAllNotes() {
@@ -497,6 +519,80 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
         hintMessage = "Catatan ragu-ragu telah dibersihkan."
       )
     }
+    saveGameProgress()
+  }
+
+  /**
+   * Fitur Tombol Cek:
+   * Memeriksa angka yang diisi oleh pemain terhadap solusi.
+   * Dibatasi maksimal 3 kali per permainan.
+   * Tidak langsung memberikan penalti kesalahan saat mengisi, pemain bebas memeriksa saat diinginkan.
+   */
+  fun checkCurrentBoard() {
+    if (_uiState.value.isPaused || _uiState.value.isGameOver || _uiState.value.isGameWon) return
+
+    if (_uiState.value.checksRemaining <= 0) {
+      _uiState.update { it.copy(hintMessage = "Batas cek (3 kali) pada permainan ini sudah habis.") }
+      return
+    }
+
+    val currentBoard = _uiState.value.board
+    val solution = _uiState.value.solution
+
+    var filledCount = 0
+    var wrongCount = 0
+
+    for (r in 0 until 9) {
+      for (c in 0 until 9) {
+        val cell = currentBoard[r][c]
+        if (!cell.isGiven && cell.value != null) {
+          filledCount++
+          if (cell.value != solution[r][c]) {
+            wrongCount++
+          }
+        }
+      }
+    }
+
+    if (filledCount == 0) {
+      _uiState.update { it.copy(hintMessage = "Belum ada angka yang kamu isi untuk diperiksa.") }
+      return
+    }
+
+    saveSnapshot()
+
+    val newChecksRemaining = _uiState.value.checksRemaining - 1
+    val newMistakes = _uiState.value.mistakesCount + wrongCount
+    val gameOver = _uiState.value.settings.mistakeLimitEnabled && newMistakes >= _uiState.value.settings.maxMistakes
+
+    val updatedBoard = currentBoard.mapIndexed { r, row ->
+      row.mapIndexed { c, cell ->
+        if (!cell.isGiven && cell.value != null) {
+          val isWrong = (cell.value != solution[r][c])
+          cell.copy(isError = isWrong)
+        } else {
+          cell
+        }
+      }
+    }
+
+    val msg = if (wrongCount == 0) {
+      "Luar biasa! Semua angka yang kamu isi sejauh ini benar. (Sisa Cek: $newChecksRemaining)"
+    } else {
+      "Ditemukan $wrongCount angka keliru yang ditandai merah. (Sisa Cek: $newChecksRemaining)"
+    }
+
+    _uiState.update {
+      it.copy(
+        board = updatedBoard,
+        checksRemaining = newChecksRemaining,
+        mistakesCount = newMistakes,
+        isGameOver = gameOver,
+        hintMessage = msg
+      )
+    }
+
+    saveGameProgress()
   }
 
   fun updateSettings(newSettings: AssistanceSettings) {
@@ -533,6 +629,154 @@ class SudokuViewModel(application: Application) : AndroidViewModel(application) 
 
   fun dismissHintMessage() {
     _uiState.update { it.copy(hintMessage = null) }
+  }
+
+  /**
+   * Simpan Otomatis Progres Permainan
+   */
+  fun saveGameProgress() {
+    val state = _uiState.value
+    if (state.isGameWon || state.isGameOver || state.board.isEmpty()) {
+      clearSavedProgress()
+      return
+    }
+
+    try {
+      val boardJson = JSONArray()
+      for (row in state.board) {
+        val rowJson = JSONArray()
+        for (cell in row) {
+          val cellObj = JSONObject()
+          cellObj.put("v", cell.value ?: 0)
+          cellObj.put("g", cell.isGiven)
+          cellObj.put("e", cell.isError)
+          val notesJson = JSONArray()
+          cell.notes.forEach { notesJson.put(it) }
+          cellObj.put("n", notesJson)
+          rowJson.put(cellObj)
+        }
+        boardJson.put(rowJson)
+      }
+
+      val solJson = JSONArray()
+      for (row in state.solution) {
+        val rowJson = JSONArray()
+        for (num in row) {
+          rowJson.put(num)
+        }
+        solJson.put(rowJson)
+      }
+
+      prefs.edit()
+        .putBoolean("saved_has_game", true)
+        .putString("saved_board", boardJson.toString())
+        .putString("saved_solution", solJson.toString())
+        .putString("saved_difficulty", state.difficulty.name)
+        .putLong("saved_timer", state.timerSeconds)
+        .putInt("saved_mistakes", state.mistakesCount)
+        .putInt("saved_checks_remaining", state.checksRemaining)
+        .apply()
+    } catch (e: Exception) {
+      e.printStackTrace()
+    }
+  }
+
+  /**
+   * Muat Kembali Progres Permainan yang Tersimpan
+   */
+  private fun restoreSavedGame(): Boolean {
+    val hasSaved = prefs.getBoolean("saved_has_game", false)
+    if (!hasSaved) return false
+
+    return try {
+      val boardStr = prefs.getString("saved_board", null) ?: return false
+      val solStr = prefs.getString("saved_solution", null) ?: return false
+      val diffName = prefs.getString("saved_difficulty", Difficulty.MUDAH.name)
+      val difficulty = try {
+        Difficulty.valueOf(diffName ?: Difficulty.MUDAH.name)
+      } catch (_: Exception) {
+        Difficulty.MUDAH
+      }
+      val timer = prefs.getLong("saved_timer", 0L)
+      val mistakes = prefs.getInt("saved_mistakes", 0)
+      val checks = prefs.getInt("saved_checks_remaining", 3)
+
+      val solJson = JSONArray(solStr)
+      val solution = mutableListOf<List<Int>>()
+      for (r in 0 until 9) {
+        val rowJson = solJson.getJSONArray(r)
+        val rowList = mutableListOf<Int>()
+        for (c in 0 until 9) {
+          rowList.add(rowJson.getInt(c))
+        }
+        solution.add(rowList)
+      }
+
+      val boardJson = JSONArray(boardStr)
+      val board = mutableListOf<List<CellData>>()
+      for (r in 0 until 9) {
+        val rowJson = boardJson.getJSONArray(r)
+        val rowList = mutableListOf<CellData>()
+        for (c in 0 until 9) {
+          val cellObj = rowJson.getJSONObject(c)
+          val v = cellObj.getInt("v")
+          val g = cellObj.getBoolean("g")
+          val e = cellObj.getBoolean("e")
+          val nJson = cellObj.getJSONArray("n")
+          val notes = mutableSetOf<Int>()
+          for (i in 0 until nJson.length()) {
+            notes.add(nJson.getInt(i))
+          }
+          rowList.add(
+            CellData(
+              row = r,
+              col = c,
+              value = if (v in 1..9) v else null,
+              notes = notes,
+              isGiven = g,
+              isError = e
+            )
+          )
+        }
+        board.add(rowList)
+      }
+
+      val remainingCounts = calculateRemainingCounts(board)
+
+      _uiState.update {
+        it.copy(
+          board = board,
+          solution = solution,
+          difficulty = difficulty,
+          timerSeconds = timer,
+          mistakesCount = mistakes,
+          checksRemaining = checks,
+          numberCounts = remainingCounts,
+          selectedCell = null,
+          selectedKeypadNumber = null,
+          isNotesMode = false,
+          isPaused = false,
+          isGameWon = false,
+          isGameOver = false,
+          canUndo = false,
+          hintMessage = "Melanjutkan progres game terakhir yang tersimpan otomatis."
+        )
+      }
+      startTimer()
+      true
+    } catch (e: Exception) {
+      e.printStackTrace()
+      false
+    }
+  }
+
+  fun clearSavedProgress() {
+    prefs.edit().putBoolean("saved_has_game", false).apply()
+  }
+
+  override fun onCleared() {
+    super.onCleared()
+    saveGameProgress()
   }
 
   private fun calculateRemainingCounts(board: List<List<CellData>>): Map<Int, Int> {

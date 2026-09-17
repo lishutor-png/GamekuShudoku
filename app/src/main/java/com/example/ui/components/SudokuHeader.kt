@@ -17,8 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Pause
@@ -132,7 +132,7 @@ fun SudokuHeader(
             .testTag("button_how_to_play")
         ) {
           Icon(
-            imageVector = Icons.Default.HelpOutline,
+            imageVector = Icons.AutoMirrored.Filled.HelpOutline,
             contentDescription = "Panduan Pemula",
             tint = MaterialTheme.colorScheme.onSurfaceVariant
           )
@@ -217,26 +217,55 @@ fun SudokuHeader(
         }
       }
 
-      // Mistakes Counter
+      // Mistakes & Checks Counters
       Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.testTag("counter_mistakes")
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
       ) {
-        Text(
-          text = "Kesalahan: ",
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-          text = if (uiState.settings.mistakeLimitEnabled) {
-            "${uiState.mistakesCount}/${uiState.settings.maxMistakes}"
+        // Mistakes Counter
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          modifier = Modifier.testTag("counter_mistakes")
+        ) {
+          Text(
+            text = "Salah: ",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+          Text(
+            text = if (uiState.settings.mistakeLimitEnabled) {
+              "${uiState.mistakesCount}/${uiState.settings.maxMistakes}"
+            } else {
+              "${uiState.mistakesCount}"
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (uiState.mistakesCount > 0) ErrorColor else MaterialTheme.colorScheme.onSurface
+          )
+        }
+
+        // Checks Counter Chip
+        Surface(
+          color = if (uiState.checksRemaining > 0) {
+            if (isDark) LimeAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
           } else {
-            "${uiState.mistakesCount}"
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
           },
-          style = MaterialTheme.typography.bodyMedium,
-          fontWeight = FontWeight.Bold,
-          color = if (uiState.mistakesCount > 0) ErrorColor else MaterialTheme.colorScheme.onSurface
-        )
+          shape = RoundedCornerShape(8.dp),
+          modifier = Modifier.testTag("chip_checks_remaining")
+        ) {
+          Text(
+            text = "Cek: ${uiState.checksRemaining}/3",
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = if (uiState.checksRemaining > 0) {
+              if (isDark) LimeAccent else MaterialTheme.colorScheme.primary
+            } else {
+              MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            }
+          )
+        }
       }
 
       // Timer & Pause/Play

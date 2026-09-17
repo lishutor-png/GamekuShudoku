@@ -19,7 +19,7 @@ data class CellData(
 data class AssistanceSettings(
   val highlightSameNumber: Boolean = true,
   val highlightRowColBox: Boolean = true,
-  val highlightDuplicates: Boolean = true,
+  val highlightDuplicates: Boolean = false,
   val autoRemoveNotes: Boolean = true,
   val mistakeLimitEnabled: Boolean = false, // Default false for friendly beginner experience
   val maxMistakes: Int = 3

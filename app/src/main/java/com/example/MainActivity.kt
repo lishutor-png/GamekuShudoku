@@ -72,6 +72,11 @@ class MainActivity : ComponentActivity() {
       }
     }
   }
+
+  override fun onPause() {
+    super.onPause()
+    viewModel.saveGameProgress()
+  }
 }
 
 @Composable
@@ -125,6 +130,7 @@ fun SudokuGameScreen(
         onEraseClick = { viewModel.eraseCell() },
         onUndoClick = { viewModel.undo() },
         onToggleNotesClick = { viewModel.toggleNotesMode() },
+        onCheckClick = { viewModel.checkCurrentBoard() },
         onHintClick = { viewModel.giveHint() },
         onDismissHint = { viewModel.dismissHintMessage() }
       )

@@ -338,7 +338,11 @@ private fun SettingToggleRow(
   switchColors: SwitchColors
 ) {
   Row(
-    modifier = Modifier.fillMaxWidth(),
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(8.dp))
+      .clickable { onCheckedChange(!checked) }
+      .padding(vertical = 4.dp, horizontal = 2.dp),
     horizontalArrangement = Arrangement.SpaceBetween,
     verticalAlignment = Alignment.CenterVertically
   ) {
@@ -636,6 +640,18 @@ fun HowToPlayDialog(onDismiss: () -> Unit) {
 
         RuleItem(
           number = "4",
+          title = "Tombol Cek (Batas 3 Kali)",
+          desc = "Mengisi angka yang keliru tidak langsung dihitung salah! Tekan tombol 'Cek' saat ingin memeriksa kebenaran angka yang sudah kamu isi (dibatasi 3 kali per game)."
+        )
+
+        RuleItem(
+          number = "5",
+          title = "Simpan Otomatis Progres",
+          desc = "Permainan otomatis tersimpan di setiap langkah. Kamu bisa menutup aplikasi dan melanjutkan kembali permainanmu kapan saja!"
+        )
+
+        RuleItem(
+          number = "6",
           title = "Fitur Bantuan Pemula",
           desc = "Gunakan tombol 'Bantuan' untuk mendapatkan jawaban pada kotak yang kamu pilih. Kamu juga bisa mengaktifkan sorotan baris, kolom, dan angka yang sama pada menu Pengaturan."
         )

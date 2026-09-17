@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -56,6 +57,7 @@ fun SudokuKeypad(
   onEraseClick: () -> Unit,
   onUndoClick: () -> Unit,
   onToggleNotesClick: () -> Unit,
+  onCheckClick: () -> Unit,
   onHintClick: () -> Unit,
   onDismissHint: () -> Unit,
   modifier: Modifier = Modifier
@@ -125,10 +127,10 @@ fun SudokuKeypad(
       }
     }
 
-    // Action Row: Undo, Erase, Notes (Ragu-ragu), Hint
+    // Action Row: Undo, Erase, Notes (Ragu-ragu), Cek (3x), Hint
     Row(
       modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceEvenly,
+      horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically
     ) {
       ActionButton(
@@ -153,6 +155,15 @@ fun SudokuKeypad(
         isDark = isDark,
         onClick = onToggleNotesClick,
         testTag = "action_notes"
+      )
+
+      // Tombol Cek (Batas 3 kali per game)
+      CheckButton(
+        checksRemaining = uiState.checksRemaining,
+        isDark = isDark,
+        enabled = uiState.checksRemaining > 0 && !uiState.isPaused && !uiState.isGameOver && !uiState.isGameWon,
+        onClick = onCheckClick,
+        testTag = "action_check"
       )
 
       ActionButton(
@@ -348,6 +359,74 @@ private fun NotesToggleButton(
       fontSize = 11.sp,
       fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
       color = if (isActive) (if (isDark) LimeAccent else MaterialTheme.colorScheme.primary) else MaterialTheme.colorScheme.onSurface
+    )
+  }
+}
+
+@Composable
+private fun CheckButton(
+  checksRemaining: Int,
+  isDark: Boolean,
+  enabled: Boolean,
+  onClick: () -> Unit,
+  testTag: String
+) {
+  val activeColor = if (isDark) LimeAccent else MaterialTheme.colorScheme.primary
+  val contentColor = if (enabled) activeColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+
+  Column(
+    horizontalAlignment = Alignment.CenterHorizontally,
+    modifier = Modifier
+      .clip(RoundedCornerShape(12.dp))
+      .clickable(enabled = enabled, onClick = onClick)
+      .padding(horizontal = 6.dp, vertical = 6.dp)
+      .testTag(testTag)
+  ) {
+    Box(
+      modifier = Modifier
+        .size(44.dp)
+        .background(
+          if (enabled) activeColor.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+          CircleShape
+        )
+        .then(
+          if (enabled) Modifier.border(1.5.dp, activeColor.copy(alpha = 0.6f), CircleShape)
+          else Modifier
+        ),
+      contentAlignment = Alignment.Center
+    ) {
+      Icon(
+        imageVector = Icons.Default.Check,
+        contentDescription = "Cek Jawaban ($checksRemaining sisa)",
+        tint = contentColor,
+        modifier = Modifier.size(22.dp)
+      )
+
+      // Remaining badge
+      Box(
+        modifier = Modifier
+          .align(Alignment.TopEnd)
+          .size(16.dp)
+          .background(
+            if (enabled) activeColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            CircleShape
+          ),
+        contentAlignment = Alignment.Center
+      ) {
+        Text(
+          text = checksRemaining.toString(),
+          fontSize = 10.sp,
+          fontWeight = FontWeight.Black,
+          color = if (isDark) Color(0xFF142900) else Color.White
+        )
+      }
+    }
+    Spacer(modifier = Modifier.height(3.dp))
+    Text(
+      text = "Cek ($checksRemaining)",
+      fontSize = 11.sp,
+      fontWeight = FontWeight.Bold,
+      color = contentColor
     )
   }
 }
